@@ -9,5 +9,4 @@ def calcular_promedio(lista_numeros):
     resultado = suma / len(lista_numeros)
     return resultado
 
-print(calcular_promedio([1, 2, 3, 4, 5]))
-  # Ahora imprimirá el mensaje de error
+print(calcular_promedio([1, 2, 3, 4, 5]))  # Ahora imprimirá el promedio: 3.0

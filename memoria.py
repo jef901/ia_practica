@@ -19,8 +19,18 @@ def cargar_historial():
 
 def guardar_historial(historial):
     try:
+        # ✂️ HISTORIAL DESLIZABLE: Conservamos el System Prompt (posición 0)
+        system_prompt = [historial[0]]
+        
+        # Tomamos solo los últimos 6 mensajes del intercambio real
+        mensajes_recientes = historial[1:][-6:]
+        
+        # Fusionamos ambos bloques para crear el historial optimizado
+        historial_recortado = system_prompt + mensajes_recientes
+        
         with open(ARCHIVO_MEMORIA, "w", encoding="utf-8") as f:
-            json.dump(historial, f, ensure_ascii=False, indent=2)
-        print("💾 [Memoria] Conversación guardada exitosamente.")
+            json.dump(historial_recortado, f, ensure_ascii=False, indent=2)
+        print("💾 [Memoria] Conversación optimizada y guardada exitosamente.")
+        
     except Exception as e:
         print(f"❌ [Memoria] Error al guardar: {e}")

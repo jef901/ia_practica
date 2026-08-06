@@ -1,9 +1,10 @@
 import os
 import re
 import ollama
-# 📦 Importamos nuestras propias herramientas locales
 from memoria import cargar_historial, guardar_historial
 from ejecutor import ejecutar_codigo
+# 📦 Importamos nuestro nuevo superpoder web
+from buscador import buscar_en_internet
 
 def extraer_codigo(texto_ia):
     patron = r"```python(.*?)```"
@@ -14,7 +15,8 @@ def iniciar_agente():
     modelo = 'qwen2.5-coder:3b'
     historial_mensajes = cargar_historial()
     
-    print(f"🤖 Agente Modular Listo ({modelo}). Comando: '/analizar nombre.py'")
+    print(f"🤖 Agente Listo ({modelo}).")
+    print("💡 Comandos: '/analizar nombre.py' o '/buscar lo que quieras saber'")
     print("👋 Escribe 'salir' para terminar.\n")
     
     while True:
@@ -26,9 +28,16 @@ def iniciar_agente():
             continue
             
         es_comando_analizar = False
-        nombre_original = ""
         
-        if prompt.startswith("/analizar "):
+        # 🔍 COMANDO EXTRA: BUSQUEDA EN INTERNET
+        if prompt.startswith("/buscar "):
+            consulta = prompt.split(" ", 1)[1].strip()
+            # 1. El script navega por internet
+            datos_web = buscar_en_internet(consulta)
+            # 2. Le inyectamos los datos frescos de internet al prompt de la IA
+            prompt = f"El usuario quiere saber sobre '{consulta}'. Utiliza esta información obtenida de internet en tiempo real para responderle:\n\n{datos_web}"
+            
+        elif prompt.startswith("/analizar "):
             nombre_original = prompt.split(" ", 1)[1].strip()
             if os.path.exists(nombre_original):
                 try:
@@ -46,10 +55,9 @@ def iniciar_agente():
 
         historial_mensajes.append({'role': 'user', 'content': prompt})
         
-        # Ciclo de autocorrección (máximo 3 intentos)
         intento = 0
         while intento < 3:
-            print(f"🤖 IA (Intento {intento + 1}): ", end="", flush=True)
+            print(f"🤖 IA: ", end="", flush=True)
             try:
                 stream = ollama.chat(model=modelo, messages=historial_mensajes, stream=True)
                 respuesta_completa_ia = ""
@@ -70,7 +78,6 @@ def iniciar_agente():
                         with open(nuevo_nombre_archivo, "w", encoding="utf-8") as f:
                             f.write(codigo_limpio)
                         
-                        # Usamos el módulo ejecutor externo 🔍
                         exito, resultado_terminal = ejecutar_codigo(nuevo_nombre_archivo)
                         
                         if exito:

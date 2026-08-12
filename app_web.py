@@ -1,6 +1,7 @@
 import os
 import streamlit as st
 import ollama
+import chromadb
 from main_rag import buscar_contexto
 from incrustador import escanear_e_indexar_carpeta
 
@@ -21,30 +22,49 @@ with st.sidebar:
     st.markdown("---")
     st.header("📥 Subir Documentos")
     
-    # 🗂️ Componente para arrastrar y soltar archivos (.txt y .docx)
     archivo_subido = st.file_uploader(
         "Selecciona un archivo para añadir al conocimiento:", 
-        type=["txt", "docx", "pdf"]  # 👈 Añadido "pdf" aquí
+        type=["txt", "docx", "pdf"]
     )
     
     if archivo_subido is not None:
         ruta_guardado = os.path.join(CARPETA_DOCS, archivo_subido.name)
         
-        # Verificar si el archivo ya existe para evitar trabajo doble
         if not os.path.exists(ruta_guardado):
             with st.spinner("💾 Guardando archivo en el disco..."):
-                # Escribir los bytes del archivo subido en nuestra carpeta de WSL 2
                 with open(ruta_guardado, "wb") as f:
                     f.write(archivo_subido.getbuffer())
             
             st.success(f"✅ Archivo '{archivo_subido.name}' guardado.")
             
-            # 🔥 Disparar automáticamente el proceso de Chunking e Indexación Vectorial
             with st.spinner("✂️ Fragmentando e indexando en ChromaDB..."):
                 escanear_e_indexar_carpeta(CARPETA_DOCS)
             st.success("🧠 ¡Base de datos vectorial actualizada!")
         else:
             st.warning(f"ℹ️ El archivo '{archivo_subido.name}' ya estaba indexado.")
+
+    st.markdown("---")
+    st.header("🧹 Mantenimiento")
+    
+    # 🔴 BOTÓN DE REINICIO DE BASE DE DATOS
+    if st.button("🚨 Reiniciar Base de Datos Vectorial", use_container_width=True):
+        with st.spinner("🧹 Vaciando ChromaDB..."):
+            try:
+                # Conectamos localmente para eliminar la colección
+                cliente = chromadb.PersistentClient(path="./db_vectorial")
+                cliente.delete_collection(name="mis_documentos")
+                
+                # También limpiamos los archivos físicos de la carpeta para empezar de cero
+                for archivo in os.listdir(CARPETA_DOCS):
+                    ruta_archivo = os.path.join(CARPETA_DOCS, archivo)
+                    if os.path.isfile(ruta_archivo):
+                        os.remove(ruta_archivo)
+                        
+                st.success("✨ ¡Todo limpio! Base de datos y archivos vaciados.")
+                # Forzamos un reinicio rápido de la interfaz para limpiar el estado visual
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Error al reiniciar: {e}")
 
     st.markdown("---")
     st.info("📚 Los documentos subidos se fragmentan de forma segura y se almacenan localmente en tu base vectorial.")
@@ -60,16 +80,13 @@ for msj in st.session_state.mensajes:
 
 # 📥 Caja de entrada de texto inferior para tus preguntas
 if pregunta := st.chat_input("Escribe tu pregunta sobre tus documentos aquí..."):
-    # Mostrar tu pregunta en la pantalla de inmediato
     with st.chat_message("user"):
         st.markdown(pregunta)
     st.session_state.mensajes.append({"role": "user", "content": pregunta})
     
-    # Buscar en ChromaDB los fragmentos semánticos relevantes
     with st.spinner("🔍 Buscando en la base de datos vectorial..."):
         contexto_privado = buscar_contexto(pregunta, max_resultados=3)
     
-    # Enviar el prompt enriquecido a Ollama y mostrar la respuesta en Streaming
     with st.chat_message("assistant"):
         prompt_enriquecido = (
             f"Con base ÚNICAMENTE en este contexto privado recabado de la base de datos:\n"
